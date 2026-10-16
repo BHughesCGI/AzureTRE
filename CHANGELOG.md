@@ -46,6 +46,7 @@ BUG FIXES:
 * Wait for management storage readiness and retry recognised state-access permission failures. Retry bootstrap state creation only when the state blob is confirmed absent. (`devops` 0.6.15) ([#5252](https://github.com/microsoft/AzureTRE/pull/5252))
 * Validate Terraform outputs and preserve the previous cache if output generation or validation fails. (`core` 0.18.14) ([#5252](https://github.com/microsoft/AzureTRE/pull/5252))
 * Delete v2 Airlock containers only after a workspace uninstall succeeds, and retry cleanup when storage deletion fails. (AI findings tab) (`API` 0.28.10)
+* Return a generic error when Airlock Event Grid publishing fails and restore the previous request state when status-change publishing fails. (`API` 0.28.11) (AI findings tab)
 * Restrict Airlock submission, cancellation and draft file links to the request creator or a workspace owner, and align the advertised actions with these permissions. (`API` 0.28.3) ([#5251](https://github.com/microsoft/AzureTRE/pull/5251))
 * Validate Airlock sort fields against the supported options and avoid returning database error details to callers. (`API` 0.28.3) ([#5251](https://github.com/microsoft/AzureTRE/pull/5251))
 * Bind operation retrieval to the authorised resource and return not found for unrelated operations. (`API` 0.28.3) ([#5251](https://github.com/microsoft/AzureTRE/pull/5251))
