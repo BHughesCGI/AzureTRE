@@ -1079,7 +1079,7 @@ async def test_delete_workspace_airlock_containers_skips_legacy_workspace(mock_b
 @pytest.mark.asyncio
 @patch("services.airlock.credentials")
 @patch("services.airlock.BlobServiceClient")
-async def test_delete_workspace_airlock_containers_does_not_raise_on_failure(mock_bsc, _mock_credentials):
+async def test_delete_workspace_airlock_containers_raises_on_failure(mock_bsc, _mock_credentials):
     from services.airlock import delete_workspace_airlock_containers
 
     workspace = MagicMock()
@@ -1088,4 +1088,5 @@ async def test_delete_workspace_airlock_containers_does_not_raise_on_failure(moc
     repo = AsyncMock()
     repo.get_data_retaining_airlock_request_ids_for_workspace.return_value = ["req-1"]
     mock_bsc.return_value.get_container_client.return_value.delete_container.side_effect = Exception("boom")
-    await delete_workspace_airlock_containers(workspace, repo)
+    with pytest.raises(RuntimeError, match="Could not delete airlock containers"):
+        await delete_workspace_airlock_containers(workspace, repo)

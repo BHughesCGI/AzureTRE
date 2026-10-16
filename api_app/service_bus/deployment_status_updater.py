@@ -6,7 +6,7 @@ import time
 from pydantic import ValidationError, TypeAdapter
 
 from api.routes.resource_helpers import get_timestamp
-from models.domain.resource import Output
+from models.domain.resource import Output, ResourceType
 from db.repositories.resources_history import ResourceHistoryRepository
 from models.domain.request_action import RequestAction
 from db.repositories.resource_templates import ResourceTemplateRepository
@@ -15,11 +15,14 @@ from azure.servicebus import NEXT_AVAILABLE_SESSION
 from azure.servicebus.exceptions import OperationTimeoutError, ServiceBusConnectionError
 from azure.servicebus.aio import ServiceBusClient, AutoLockRenewer
 from db.repositories.operations import OperationRepository
+from db.repositories.airlock_requests import AirlockRequestRepository
 from core import config, credentials
 from db.errors import EntityDoesNotExist
 from db.repositories.resources import ResourceRepository
 from models.domain.operation import DeploymentStatusUpdateMessage, Operation, OperationStep, Status
+from models.domain.workspace import Workspace
 from resources import strings
+from services.airlock import delete_workspace_airlock_containers
 from services.logging import logger, tracer
 
 
@@ -220,6 +223,19 @@ class DeploymentStatusUpdater:
                     next_step.status = Status.UpdatingFailed
                     await self.update_overall_operation_status(operation, next_step, is_last_step)
                     await self.operations_repo.update_item(operation)
+
+            main_step = next((step for step in operation.steps if step.templateStepId == "main"), None)
+            if (
+                operation.action == RequestAction.UnInstall
+                and operation.status == Status.Deleted
+                and main_step is not None
+                and main_step.resourceType == ResourceType.Workspace
+            ):
+                workspace = await self.resource_repo.get_resource_by_id(uuid.UUID(operation.resourceId))
+                if not isinstance(workspace, Workspace):
+                    raise TypeError(f"Expected workspace resource for uninstall operation {operation.id}")
+                airlock_request_repo = await AirlockRequestRepository.create()
+                await delete_workspace_airlock_containers(workspace, airlock_request_repo)
 
             result = True
 
