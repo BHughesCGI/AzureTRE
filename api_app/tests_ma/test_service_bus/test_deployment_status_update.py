@@ -292,12 +292,16 @@ async def test_when_updating_and_state_store_exception(logging_mock, resource_re
     assert complete_message is False
 
 
+@patch("service_bus.deployment_status_updater.delete_workspace_airlock_containers", new_callable=AsyncMock)
+@patch("service_bus.deployment_status_updater.AirlockRequestRepository.create", new_callable=AsyncMock)
 @patch("service_bus.deployment_status_updater.ResourceHistoryRepository.create")
 @patch("service_bus.deployment_status_updater.ResourceTemplateRepository.create")
 @patch("service_bus.deployment_status_updater.get_timestamp", return_value=FAKE_UPDATE_TIMESTAMP)
 @patch("service_bus.deployment_status_updater.OperationRepository.create")
 @patch("service_bus.deployment_status_updater.ResourceRepository.create")
-async def test_state_transitions_from_deployed_to_deleted(resource_repo, operations_repo_mock, _, __, ___):
+async def test_state_transitions_from_deployed_to_deleted(
+    resource_repo, operations_repo_mock, _, __, ___, create_airlock_repo, delete_airlock_containers
+):
     updated_message = test_sb_message.copy()
     updated_message["status"] = Status.Deleted
     updated_message["message"] = "Has been deleted"
@@ -326,6 +330,70 @@ async def test_state_transitions_from_deployed_to_deleted(resource_repo, operati
     assert complete_message is True
     operations_repo_mock.return_value.update_item.assert_awaited_with(expected_operation)
     assert resource_repo.return_value.update_item.call_args.args[0].deploymentStatus == Status.Deleted
+    create_airlock_repo.assert_awaited_once()
+    delete_airlock_containers.assert_awaited_once_with(workspace, create_airlock_repo.return_value)
+
+
+@patch("service_bus.deployment_status_updater.delete_workspace_airlock_containers", new_callable=AsyncMock)
+@patch("service_bus.deployment_status_updater.AirlockRequestRepository.create", new_callable=AsyncMock)
+@patch("service_bus.deployment_status_updater.ResourceHistoryRepository.create")
+@patch("service_bus.deployment_status_updater.ResourceTemplateRepository.create")
+@patch("service_bus.deployment_status_updater.get_timestamp", return_value=FAKE_UPDATE_TIMESTAMP)
+@patch("service_bus.deployment_status_updater.OperationRepository.create")
+@patch("service_bus.deployment_status_updater.ResourceRepository.create")
+async def test_workspace_airlock_containers_are_not_deleted_when_uninstall_fails(
+    resource_repo, operations_repo_mock, _, __, ___, create_airlock_repo, delete_airlock_containers
+):
+    updated_message = test_sb_message.copy()
+    updated_message["status"] = Status.DeletingFailed
+    received_message = ServiceBusReceivedMessageMock(updated_message)
+
+    workspace = create_sample_workspace_object(updated_message["id"])
+    resource_repo.return_value.get_resource_by_id.return_value = workspace
+
+    operation = create_sample_operation(workspace.id, RequestAction.UnInstall)
+    operation.steps[0].status = Status.Deployed
+    operations_repo_mock.return_value.get_operation_by_id.return_value = operation
+
+    status_updater = DeploymentStatusUpdater()
+    await status_updater.init_repos()
+    complete_message = await status_updater.process_message(received_message)
+
+    assert complete_message is True
+    create_airlock_repo.assert_not_awaited()
+    delete_airlock_containers.assert_not_awaited()
+
+
+@patch("service_bus.deployment_status_updater.delete_workspace_airlock_containers", new_callable=AsyncMock)
+@patch("service_bus.deployment_status_updater.AirlockRequestRepository.create", new_callable=AsyncMock)
+@patch("service_bus.deployment_status_updater.ResourceHistoryRepository.create")
+@patch("service_bus.deployment_status_updater.ResourceTemplateRepository.create")
+@patch("service_bus.deployment_status_updater.get_timestamp", return_value=FAKE_UPDATE_TIMESTAMP)
+@patch("service_bus.deployment_status_updater.OperationRepository.create")
+@patch("service_bus.deployment_status_updater.ResourceRepository.create")
+async def test_workspace_airlock_cleanup_failure_retries_status_message(
+    resource_repo, operations_repo_mock, _, __, ___, create_airlock_repo, delete_airlock_containers
+):
+    updated_message = test_sb_message.copy()
+    updated_message["status"] = Status.Deleted
+    received_message = ServiceBusReceivedMessageMock(updated_message)
+
+    workspace = create_sample_workspace_object(updated_message["id"])
+    resource_repo.return_value.get_resource_by_id.return_value = workspace
+    resource_repo.return_value.get_resource_dict_by_id.return_value = workspace.model_dump()
+
+    operation = create_sample_operation(workspace.id, RequestAction.UnInstall)
+    operation.steps[0].status = Status.Deployed
+    operations_repo_mock.return_value.get_operation_by_id.return_value = operation
+    delete_airlock_containers.side_effect = RuntimeError("storage unavailable")
+
+    status_updater = DeploymentStatusUpdater()
+    await status_updater.init_repos()
+    complete_message = await status_updater.process_message(received_message)
+
+    assert complete_message is False
+    create_airlock_repo.assert_awaited_once()
+    delete_airlock_containers.assert_awaited_once_with(workspace, create_airlock_repo.return_value)
 
 
 @patch("service_bus.deployment_status_updater.ResourceHistoryRepository.create")

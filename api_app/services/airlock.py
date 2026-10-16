@@ -192,7 +192,7 @@ def _delete_container(account_name: str, container_name: str, credential) -> boo
 async def delete_workspace_airlock_containers(
     workspace: Workspace, airlock_request_repo: AirlockRequestRepository
 ) -> None:
-    """Delete shared containers without blocking workspace deletion on failures."""
+    """Delete shared containers and raise on failures so the status message can be retried."""
     # Version changes cannot leave v1 data attached to a v2 workspace.
     if workspace.properties.get("airlock_version", 1) < 2:
         return
@@ -227,9 +227,10 @@ async def delete_workspace_airlock_containers(
 
     logger.info(f"Deleted {deleted} airlock container(s) for workspace {workspace.id}")
     if failed:
-        logger.error(
-            f"Could not delete airlock containers for workspace {workspace.id}, request ids: {sorted(set(failed))}"
-        )
+        failed_request_ids = sorted(set(failed))
+        message = f"Could not delete airlock containers for workspace {workspace.id}, request ids: {failed_request_ids}"
+        logger.error(message)
+        raise RuntimeError(message)
 
 
 async def review_airlock_request(
