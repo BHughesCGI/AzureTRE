@@ -494,11 +494,14 @@ async def save_and_publish_event_airlock_request(
         logger.debug(f"Sending status changed event for airlock request item: {airlock_request.id}")
         await send_status_changed_event(airlock_request=airlock_request, previous_status=None, workspace=workspace)
         await send_airlock_notification_event(airlock_request, workspace, role_assignment_details)
-    except Exception as e:
-        await airlock_request_repo.delete_item(airlock_request.id)
+    except Exception:
         logger.exception("Failed sending status_changed message")
+        try:
+            await airlock_request_repo.delete_item(airlock_request.id)
+        except Exception:
+            logger.exception(f"Failed removing airlock request {airlock_request.id} after Event Grid failure")
         raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=strings.EVENT_GRID_PUBLISH_FAILED.format(e)
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=strings.EVENT_GRID_GENERAL_ERROR_MESSAGE
         )
 
 
@@ -514,6 +517,17 @@ async def update_and_publish_event_airlock_request(
     review_user_resource: Optional[AirlockReviewUserResource] = None,
     scan_result=_UNSET,
 ) -> AirlockRequest:
+    role_assignment_details = {}
+    if new_status:
+        try:
+            access_service = get_aad_service()
+            role_assignment_details = access_service.get_workspace_user_emails_by_role_assignment(workspace)
+        except Exception:
+            logger.exception("Failed to retrieve workspace role assignments from Microsoft Graph")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=strings.GRAPH_ROLE_ASSIGNMENT_ERROR
+            )
+
     try:
         logger.debug(f"Updating airlock request item: {airlock_request.id}")
         updated_airlock_request = await airlock_request_repo.update_airlock_request(
@@ -545,23 +559,35 @@ async def update_and_publish_event_airlock_request(
         return updated_airlock_request
 
     try:
-        access_service = get_aad_service()
-        role_assignment_details = access_service.get_workspace_user_emails_by_role_assignment(workspace)
-    except Exception:
-        logger.exception("Failed to retrieve workspace role assignments from Microsoft Graph")
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=strings.GRAPH_ROLE_ASSIGNMENT_ERROR)
-
-    try:
         logger.debug(f"Sending status changed event for airlock request item: {airlock_request.id}")
         await send_status_changed_event(
             airlock_request=updated_airlock_request, previous_status=airlock_request.status, workspace=workspace
         )
+    except Exception:
+        logger.exception("Failed sending status_changed message")
+        try:
+            logger.warning(
+                f"Reverting airlock request item {updated_airlock_request.id} to previous status "
+                f"{airlock_request.status} because event publication failed"
+            )
+            await airlock_request_repo.restore_airlock_request_item(
+                original_request=airlock_request, updated_request=updated_airlock_request, updated_by=updated_by
+            )
+        except Exception:
+            logger.exception(
+                f"Failed to revert airlock request item {updated_airlock_request.id} after event publication failure"
+            )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=strings.EVENT_GRID_GENERAL_ERROR_MESSAGE
+        )
+
+    try:
         await send_airlock_notification_event(updated_airlock_request, workspace, role_assignment_details)
         return updated_airlock_request
-    except Exception as e:
-        logger.exception("Failed sending status_changed message")
+    except Exception:
+        logger.exception("Failed sending airlock notification message")
         raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=strings.EVENT_GRID_PUBLISH_FAILED.format(e)
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=strings.EVENT_GRID_GENERAL_ERROR_MESSAGE
         )
 
 
