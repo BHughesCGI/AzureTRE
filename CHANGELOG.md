@@ -50,6 +50,7 @@ BUG FIXES:
 * Delete v2 Airlock containers only after a workspace uninstall succeeds, and retry cleanup when storage deletion fails. (AI findings tab) (`API` 0.28.10)
 * Return a generic error when Airlock Event Grid publishing fails and restore the previous request state when status-change publishing fails. (`API` 0.28.11) (AI findings tab)
 * Preserve native boolean deployment outputs and log the intended diagnostic for callbacks referencing an unknown operation step. (`API` 0.28.12) (AI findings tab)
+* Validate certificate script arguments before performing any operations and show usage for missing values, required options or unknown arguments. (`tre-shared-service-certs` 0.9.1) (AI findings tab)
 * Clean up Guacamole VMs and Microsoft Entra ID workspace services created by E2E tests, including after failures when parent workspaces or services are reused. (AI findings tab)
 * Honour the configured TLS verification setting in the provisioned API health smoke test, enabling certificate verification by default. (AI findings tab)
 * Stop echoing the workspace Gitea administrator password and OIDC client secret in container logs. (`tre-workspace-service-gitea` 1.3.8, `gitea-workspace-service` 0.6.3) (AI findings tab)
