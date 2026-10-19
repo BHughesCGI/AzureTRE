@@ -36,8 +36,8 @@ The contents of your authentication section in `config.yaml` file should contain
   | `API_CLIENT_ID` | API application (client) ID. |
   | `API_CLIENT_SECRET` | API application client secret. |
   | `SWAGGER_UI_CLIENT_ID` | Swagger (OpenAPI) UI application (client) ID. |
-  | `WORKSPACE_API_CLIENT_ID` | Each workspace is secured behind it's own AD Application |
-  | `WORKSPACE_API_CLIENT_SECRET` | Each workspace is secured behind it's own AD Application. This is the secret for that application. |
+  | `WORKSPACE_API_CLIENT_ID` | Each workspace is secured behind its own AD Application |
+  | `WORKSPACE_API_CLIENT_SECRET` | Each workspace is secured behind its own AD Application. This is the secret for that application. |
 
 ### Using a separate Microsoft Entra ID tenant
 
