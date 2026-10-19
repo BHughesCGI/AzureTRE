@@ -152,7 +152,7 @@ class DeploymentStatusUpdater:
                         is_last_step = True
 
             if step_to_update is None:
-                raise f"Error finding step {message.stepId} in operation {message.operationId}"
+                raise ValueError(f"Error finding step {message.stepId} in operation {message.operationId}")
 
             # update the step status
             step_to_update.status = message.status
@@ -317,7 +317,7 @@ class DeploymentStatusUpdater:
 
         return resource
 
-    def convert_outputs_to_dict(self, outputs_list: [Output]):
+    def convert_outputs_to_dict(self, outputs_list: list[Output]):
         """
         Convert a list of Porter outputs to a dictionary
         """
@@ -335,8 +335,9 @@ class DeploymentStatusUpdater:
                 value = value.strip("'").strip('"')
             elif obj_type == "boolean":
                 if isinstance(value, str):
-                    value = value.strip("'").strip('"')
-                value = value.lower() == "true"
+                    value = value.strip("'").strip('"').lower() == "true"
+                elif not isinstance(value, bool):
+                    raise ValueError(f"Boolean output {name} must be a boolean or string")
 
             result_dict[name] = value
 

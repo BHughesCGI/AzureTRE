@@ -602,3 +602,48 @@ async def test_convert_outputs_to_dict():
         "list2": ["one", "two"],
     }
     assert status_updater.convert_outputs_to_dict(deployment_status_update_message.outputs) == expected_result
+
+
+@pytest.mark.parametrize("value, expected", [(True, True), (False, False), ("TRUE", True), ('"False"', False)])
+async def test_boolean_callback_outputs_are_persisted(value, expected):
+    payload = {
+        **test_sb_message,
+        "status": Status.Deployed,
+        "outputs": [{"Name": "enabled", "Value": value, "Type": "boolean"}],
+    }
+    message = TypeAdapter(DeploymentStatusUpdateMessage).validate_python(payload)
+    resource = {"properties": {}}
+
+    result = DeploymentStatusUpdater().create_updated_resource_document(resource, message)
+
+    assert result["properties"]["enabled"] is expected
+
+
+@pytest.mark.parametrize("value", [[], {"enabled": True}])
+async def test_boolean_callback_outputs_reject_unsupported_values(value):
+    payload = {
+        **test_sb_message,
+        "outputs": [{"Name": "enabled", "Value": value, "Type": "boolean"}],
+    }
+    message = TypeAdapter(DeploymentStatusUpdateMessage).validate_python(payload)
+
+    with pytest.raises(ValueError, match="Boolean output enabled must be a boolean or string"):
+        DeploymentStatusUpdater().convert_outputs_to_dict(message.outputs)
+
+
+async def test_unknown_step_logs_value_error_without_writing_state(caplog):
+    message = TypeAdapter(DeploymentStatusUpdateMessage).validate_python({**test_sb_message, "stepId": "unknown-step"})
+    updater = DeploymentStatusUpdater()
+    updater.operations_repo = AsyncMock()
+    updater.resource_repo = AsyncMock()
+    updater.operations_repo.get_operation_by_id.return_value = create_sample_operation(
+        str(message.id), RequestAction.Install
+    )
+
+    assert await updater.update_status_in_database(message) is False
+
+    record = next(record for record in caplog.records if record.message == "Failed to update status")
+    assert isinstance(record.exc_info[1], ValueError)
+    assert str(record.exc_info[1]) == f"Error finding step {message.stepId} in operation {message.operationId}"
+    updater.operations_repo.update_item.assert_not_awaited()
+    updater.resource_repo.update_item.assert_not_awaited()
