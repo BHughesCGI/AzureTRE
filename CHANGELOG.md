@@ -29,6 +29,7 @@ See [Legacy Airlock & migration](docs/azure-tre-overview/airlock.md#legacy-airlo
 * Add weekly and manual builds for Dockerfiles and Porter bundles, with selected pull request builds. Retry a failed target once and report final results. ([#5088](https://github.com/microsoft/AzureTRE/issues/5088))
 
 BUG FIXES:
+* Validate certificate script arguments before performing any operations and show usage for missing values, required options or unknown arguments. (`tre-shared-service-certs` 0.7.14) (AI findings tab)
 * Clean up Guacamole VMs and Microsoft Entra ID workspace services created by E2E tests, including after failures when parent workspaces or services are reused. (AI findings tab)
 * Honour the configured TLS verification setting in the provisioned API health smoke test, enabling certificate verification by default. (AI findings tab)
 * Preserve native boolean deployment outputs and log the intended diagnostic for callbacks referencing an unknown operation step. (`API` 0.28.6) (AI findings tab)
