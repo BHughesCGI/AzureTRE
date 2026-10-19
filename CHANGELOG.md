@@ -29,6 +29,7 @@ See [Legacy Airlock & migration](docs/azure-tre-overview/airlock.md#legacy-airlo
 * Add weekly and manual builds for Dockerfiles and Porter bundles, with selected pull request builds. Retry a failed target once and report final results. ([#5088](https://github.com/microsoft/AzureTRE/issues/5088))
 
 BUG FIXES:
+* Stop echoing the workspace Gitea administrator password and OIDC client secret in container logs. (`tre-workspace-service-gitea` 1.3.8, `gitea-workspace-service` 0.6.3) (AI findings tab)
 * Return a generic error when Airlock Event Grid publishing fails and restore the previous request state when status-change publishing fails. (`API` 0.28.5) (AI findings tab)
 * Delete v2 Airlock containers only after a workspace uninstall succeeds, and retry cleanup when storage deletion fails. (AI findings tab) (`API` 0.28.4)
 * Restrict Airlock submission, cancellation and draft file links to the request creator or a workspace owner, and align the advertised actions with these permissions. (`API` 0.28.3) ([#5251](https://github.com/microsoft/AzureTRE/pull/5251))
