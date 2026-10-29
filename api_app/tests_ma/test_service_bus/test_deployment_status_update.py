@@ -352,7 +352,7 @@ async def test_workspace_airlock_containers_are_not_deleted_when_uninstall_fails
     resource_repo.return_value.get_resource_by_id.return_value = workspace
 
     operation = create_sample_operation(workspace.id, RequestAction.UnInstall)
-    operation.steps[0].status = Status.Deployed
+    operation.steps[0].status = Status.Deleting
     operations_repo_mock.return_value.get_operation_by_id.return_value = operation
 
     status_updater = DeploymentStatusUpdater()
@@ -383,7 +383,7 @@ async def test_workspace_airlock_cleanup_failure_retries_status_message(
     resource_repo.return_value.get_resource_dict_by_id.return_value = workspace.model_dump()
 
     operation = create_sample_operation(workspace.id, RequestAction.UnInstall)
-    operation.steps[0].status = Status.Deployed
+    operation.steps[0].status = Status.Deleting
     operations_repo_mock.return_value.get_operation_by_id.return_value = operation
     delete_airlock_containers.side_effect = RuntimeError("storage unavailable")
 
@@ -394,6 +394,17 @@ async def test_workspace_airlock_cleanup_failure_retries_status_message(
     assert complete_message is False
     create_airlock_repo.assert_awaited_once()
     delete_airlock_containers.assert_awaited_once_with(workspace, create_airlock_repo.return_value)
+    assert operation.status == Status.Deleting
+    assert operation.steps[0].statusUpdateComplete is False
+
+    delete_airlock_containers.side_effect = None
+    assert await status_updater.process_message(received_message) is True
+    assert delete_airlock_containers.await_count == 2
+    assert operation.status == Status.Deleted
+    assert operation.steps[0].statusUpdateComplete is True
+
+    assert await status_updater.process_message(received_message) is True
+    assert delete_airlock_containers.await_count == 2
 
 
 @patch("service_bus.deployment_status_updater.ResourceHistoryRepository.create")
@@ -422,7 +433,7 @@ async def test_outputs_are_added_to_resource_item(resource_repo, operations_repo
     expected_resource = resource
     expected_resource.properties = {**resource.properties, **new_params}
 
-    operation = create_sample_operation(resource.id, RequestAction.UnInstall)
+    operation = create_sample_operation(resource.id, RequestAction.Install)
     operations_repo.return_value.get_operation_by_id.return_value = operation
 
     status_updater = DeploymentStatusUpdater()
@@ -446,7 +457,7 @@ async def test_properties_dont_change_with_no_outputs(resource_repo, operations_
     resource.properties = {"exitingName": "exitingValue"}
     resource_repo.return_value.get_resource_dict_by_id.return_value = resource.model_dump()
 
-    operation = create_sample_operation(resource.id, RequestAction.UnInstall)
+    operation = create_sample_operation(resource.id, RequestAction.Install)
     operations_repo.return_value.get_operation_by_id.return_value = operation
 
     expected_resource = resource

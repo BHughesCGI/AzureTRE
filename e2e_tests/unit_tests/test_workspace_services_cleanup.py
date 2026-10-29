@@ -75,6 +75,8 @@ class WorkspaceServicesCleanupTests(unittest.IsolatedAsyncioTestCase):
                 await run()
 
         expected = ["POST"] if rejected else ["POST", "GET", "PATCH", "GET", "DELETE", "GET"]
+        if install_failed:
+            expected.insert(2, "GET")
         self.assertEqual([request.method for request in requests], expected)
 
     async def test_success_removes_owned_resources_from_reused_parents(self):

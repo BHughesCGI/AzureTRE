@@ -27,4 +27,6 @@ class HealthTlsTests(unittest.IsolatedAsyncioTestCase):
                     await health.test_health(verify=verify)
 
                     factory.assert_called_once_with(verify=verify)
-                    client.get.assert_awaited_once_with(f"https://tre.example.test{health.strings.API_HEALTH}")
+                    client.get.assert_awaited_once_with(
+                        f"https://tre.example.test{health.strings.API_HEALTH}", timeout=30
+                    )
